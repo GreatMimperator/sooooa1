@@ -1,0 +1,433 @@
+openapi: 3.0.0
+info:
+  title: Vehicle Management API
+  description: API для управления коллекцией объектов Vehicle
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /vehicles:
+    get:
+      summary: Получить список всех транспортных средств
+      description: Возвращает массив объектов транспортных средств с поддержкой сортировки, фильтрации и постраничного вывода.
+      operationId: getVehicles
+      parameters:
+        - name: page
+          in: query
+          description: Номер страницы для вывода
+          required: false
+          explode: true
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Размер страницы
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 5
+            maximum: 100
+        - name: sort
+          in: query
+          description: Поля для сортировки. Через запятую, в формате "-field" для убывающих, "field" для возрастающих, сортировка по первым, Поля - от схемы [VehicleAllFields](#/components/schemas/VehicleAllFields)
+          required: false
+          schema:
+            type: string
+            example: creationDate,name
+        - name: filter
+          in: query
+          description: Условия фильтрации. Через запятую, в формате field=value
+          required: false
+          schema:
+            type: string
+            example: creationDate=2007-12-03,name=Toyota
+      responses:
+        '200':
+          description: Успешная операция
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalPages:
+                    description: Общее количество страниц на основе параметра "size"
+                    type: integer
+                    example: 1
+                  vehicles:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/VehicleAllFields'
+                        - required:
+                          - id
+                          - name
+                          - coordinates
+                          - creationDate
+                          - enginePower
+                          - type
+                required:
+                  - totalPages
+                  - vehicles
+        '400':
+          description: Некорректные параметры запроса
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Параметр фильрации id имеет некорректный формат
+    post:
+      summary: Добавить новое транспортное средство
+      description: Создает новый объект транспортного средства и возвращает его id с временем создания.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleUserSetFieldsExistedRestricted'
+      responses:
+        '201':
+          description: Идентификатор и время создания
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    $ref: '#/components/schemas/VehicleId'
+                  creationDate:
+                    $ref: '#/components/schemas/VehicleCreationDate'
+                required:
+                  - id
+                  - creationDate
+        '400':
+          description: Некорректные данные запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongVehicleIdFormatAnswer'
+
+  /vehicles/{id}:
+    get:
+      summary: Получить транспортное средство по id
+      description: Возвращает объект транспортного средства по заданному id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleId'
+      responses:
+        '200':
+          description: Успешная операция
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleAllFieldsNoIdExistedRestricted'
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongVehicleIdFormatAnswer'
+        '404':
+          description: Транспортное средство с указанным id не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoVehicleWithIdAnswer'
+    put:
+      summary: Обновить транспортное средство по id
+      description: Обновляет информацию о транспортном средстве по заданному id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleUserSetFieldsExistedRestricted'
+      responses:
+        '200':
+          description: Успешно обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleAllFieldsNoIdExistedRestricted'
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongVehicleIdFormatAnswer'
+        '404':
+          description: Транспортное средство с указанным id не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoVehicleWithIdAnswer'
+    delete:
+      summary: Удалить транспортное средство по id
+      description: Удаляет транспортное средство по заданному id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleId'
+      responses:
+        '204':
+          description: Успешно удалено
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongVehicleIdFormatAnswer'
+        '404':
+          description: Транспортное средство с указанным id не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoVehicleWithIdAnswer'
+
+  /vehicles/delete-any-by-distance/{distance}:
+    delete:
+      summary: Удалить одно транспортное средство по пробегу
+      description: Удаляет одно транспортное средство, значение поля `distanceTravelled` которого равно заданному.
+      parameters:
+        - name: distance
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleDistanceTravelled'
+      responses:
+        '204':
+          description: Успешно удалено
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongVehicleIdFormatAnswer'
+        '404':
+          description: Транспортное средство не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoVehicleWithIdAnswer'
+
+  /vehicles/one-min-wheels:
+    get:
+      summary: Получить транспортное средство с минимальным числом колёс
+      description: Возвращает одно транспортное средство с минимальным значением поля `numberOfWheels`.
+      responses:
+        '200':
+          description: Успешная операция
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleAllFieldsExistedRestricted'
+        '404':
+          description: Транспортных средств нет
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Транспортных средств нет
+
+  /vehicles/search-by-name/{substring}:
+    get:
+      summary: Найти транспортные средства по подстроке в имени
+      description: Возвращает массив объектов транспортных средств, значение поля `name` которых содержит заданную подстроку.
+      parameters:
+        - name: substring
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+        - name: page
+          in: query
+          description: Номер страницы для вывода
+          required: false
+          explode: true
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Размер страницы
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 5
+            maximum: 100
+      responses:
+        '200':
+          description: Успешная операция
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VehicleAllFieldsExistedRestricted'
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Указанная подстрока слишком длинная
+
+components:
+  schemas:
+    VehicleUserSetFields:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/VehicleName'
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        enginePower:
+          $ref: '#/components/schemas/VehicleEnginePower'
+        numberOfWheels:
+          $ref: '#/components/schemas/VehicleNumberOfWheels'
+        distanceTravelled:
+          $ref: '#/components/schemas/VehicleDistanceTravelled'
+        type:
+          $ref: '#/components/schemas/VehicleType'
+    VehicleUserSetFieldsExistedRestricted:
+      allOf:
+        - $ref: '#/components/schemas/VehicleUserSetFields'
+        - required:
+          - name
+          - coordinates
+          - enginePower
+          - type
+    VehicleAllFieldsNoId:
+      allOf:
+        - type: object
+          properties:
+            creationDate:
+              $ref: '#/components/schemas/VehicleCreationDate'
+        - $ref: '#/components/schemas/VehicleUserSetFields'
+    VehicleAllFieldsNoIdExistedRestricted:
+      allOf:
+        - $ref: '#/components/schemas/VehicleAllFieldsNoId'
+        - required:
+          - name
+          - coordinates
+          - creationDate
+          - enginePower
+          - type
+    VehicleAllFields:
+      allOf:
+        - type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/VehicleId'
+            creationDate:
+              $ref: '#/components/schemas/VehicleCreationDate'
+        - $ref: '#/components/schemas/VehicleUserSetFields'
+    VehicleAllFieldsExistedRestricted:
+      allOf:
+        - $ref: '#/components/schemas/VehicleAllFields'
+        - required:
+          - id
+          - name
+          - coordinates
+          - creationDate
+          - enginePower
+          - type
+    VehicleId:
+      description: Уникальный идентификатор транспортного средства
+      type: number
+      format: int64
+      minimum: 1
+      example: 123
+    VehicleName: 
+      description: Название транспортного средства
+      type: string
+      minLength: 1
+      example: Kia Rio
+    Coordinates:
+      type: object
+      properties:
+        x:
+          $ref: '#/components/schemas/CoordinateX'
+        y:
+          $ref: '#/components/schemas/CoordinateY'
+      required: 
+        - y
+    VehicleCreationDate:
+      description: Дата создания транспортного средства
+      type: string
+      format: yyyy-mm-dd
+      example: 2007-12-03
+    VehicleEnginePower:
+      description: Сила мотора транспортного средства в лошадиных силах
+      type: number
+      format: int32
+      minimum: 1
+      example: 200
+    VehicleDistanceTravelled:
+      description: Кол-во километров, которое преодолело транспортное средство в километрах (пробег)
+      type: number
+      format: int32
+      minimum: 1
+      example: 11003
+    VehicleNumberOfWheels:
+      description: Кол-во колес у транспортного средства
+      type: number
+      example: 4
+    VehicleType:
+      type: string
+      description: Тип транспортного средства
+      enum:
+        - HELICOPTER
+        - DRONE
+        - SHIP
+        - BICYCLE
+        - CHOPPER
+    CoordinateX:
+      description: Координата X
+      type: number
+      format: float64
+      example: 31412
+    CoordinateY:
+      description: Координата Y
+      type: number
+      format: float64
+      maximum: 126
+      example: 100
+    WrongVehicleIdFormatAnswer:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Параметр id имеет некорректный формат
+    NoVehicleWithIdAnswer:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Транспортное средство с указанным id не найдено
