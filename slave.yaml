@@ -2,10 +2,73 @@ openapi: 3.0.0
 info:
   title: Vehicle Helper API
   description: API определяющий ряд дополнительных операций, связанных с Vehicle API
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: /api/v1/shop
 paths:
+  /vehicles/search/by-number-of-wheels/{from}/{to}:
+    get:
+      summary: Найти транспортные средства по числу колёс в диапазоне
+      tags:
+        - vehicles
+      description: Возвращает массив транспортных средств с числом колёс в заданном диапазоне
+      parameters:
+        - name: from
+          in: path
+          description: От включительно
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleNumberOfWheels'
+        - name: to
+          in: path
+          description: До включительно
+          required: true
+          schema:
+            $ref: '#/components/schemas/VehicleNumberOfWheels'
+      responses:
+        '200':
+          description: Успешная операция
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VehicleAllFieldsExistedRestricted'
+        '400':
+          description: Некорректные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestAnswer'
+        '422':
+          description: Данные не прошли валидацию
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongPropertiesAnswer'
+        '500':
+          description: Внутренняя ошибка на стороне сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerErrorAnswer'
+              example:
+                  timestamp: 2024-10-13T19:49:21.062+00:00
+                  status: 500
+                  error: Internal Server Error
+                  path: /vehicles/search/by-number-of-wheels/1/2
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerErrorAnswer'
+              example:
+                timestamp: 2024-10-13T19:49:21.062+00:00
+                status: 503
+                error: Service Unavaliable
+                path: /vehicles/search/by-number-of-wheels/1/2
+
   /vehicles/fix-distance/{id}:
     patch:
       summary: Сбросить пробег транспортного средства
@@ -120,6 +183,19 @@ components:
             creationDate:
               $ref: '#/components/schemas/VehicleCreationDate'
         - $ref: '#/components/schemas/VehicleUserSetFields'
+        
+    VehicleAllFieldsExistedRestricted:
+      allOf:
+        - $ref: '#/components/schemas/VehicleAllFields'
+        - required:
+          - id
+          - name
+          - coordinates
+          - creationDate
+          - enginePower
+          - numberOfWheels
+          - distanceTravelled
+          - type  
     
     VehicleId:
       description: Уникальный идентификатор транспортного средства
